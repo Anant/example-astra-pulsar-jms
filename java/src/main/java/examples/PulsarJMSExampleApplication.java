@@ -67,7 +67,7 @@ abstract public class PulsarJMSExampleApplication extends PulsarJMSExample {
         jmsConnMap.put("tlsTrustCertsFilePath", clientConnConf.getValue("tlsTrustCertsFilePath"));
         jmsConnMap.put("tlsAllowInsecureConnection", clientConnConf.getValue("tlsAllowInsecureConnection"));
         jmsConnMap.put("jms.systemNamespace", clientConnConf.getValue("jms.systemNamespace"));
-        
+        jmsConnMap.put("jms.forceDeleteTemporaryDestinations", clientConnConf.getValue("jms.forceDeleteTemporaryDestinations"));
         return new PulsarConnectionFactory(jmsConnMap);
     }
 

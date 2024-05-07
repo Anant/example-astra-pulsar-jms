@@ -50,7 +50,7 @@ public class PulsarJMSExampleProcessor extends PulsarJMSExampleApplication {
     }
 
     public static void main(String[] args) {
-        PulsarJMSExample workshopApp = new PulsarJMSExampleSender(APP_NAME, args);
+        PulsarJMSExample workshopApp = new PulsarJMSExampleProcessor(APP_NAME, args);
         int exitCode = workshopApp.runCmdApp();
         System.exit(exitCode);
     }
@@ -66,8 +66,8 @@ public class PulsarJMSExampleProcessor extends PulsarJMSExampleApplication {
         }
     }
 
-    @Override
-    public void execute() throws ConfRuntimeException {
+
+    private TemporaryQueue sendMessagesToTempTopic(){
         // produce messages 
         try {
             if (connectionFactory == null) {
@@ -81,9 +81,10 @@ public class PulsarJMSExampleProcessor extends PulsarJMSExampleApplication {
                 if (queueDestination == null) {
                     //queueDestination = createQueueDestination(jmsContext, topicName);
                     queueDestination = jmsContext.createTemporaryQueue(); //createTempQueueDestination(jmsContext, topicName);
+                    logger.info("Temporary queue created: {}", queueDestination.getQueueName());
                 }
-                
             }
+            
 
             assert (iotSensorDataCsvFile != null);
             CsvFileLineScanner csvFileLineScanner = new CsvFileLineScanner(iotSensorDataCsvFile);
@@ -94,7 +95,111 @@ public class PulsarJMSExampleProcessor extends PulsarJMSExampleApplication {
             if (numMsg == -1) {
                 numMsg = Integer.MAX_VALUE;
             }
-            
+
+            while (csvFileLineScanner.hasNextLine()) {
+                String csvLine = csvFileLineScanner.getNextLine();
+                // Skip the first line which is a title line
+                if (!isTitleLine) {
+                    if (msgSent < numMsg) {
+                        jmsProducer.send(queueDestination, csvLine);
+                        logger.info("IoT sensor data sent to queue {} [{}] {}",
+                                queueDestination.getQueueName(),
+                                msgSent,
+                                csvLine);
+                        msgSent++;
+                    } else {
+                        return queueDestination;
+                    }
+                } else {
+                    isTitleLine = false;
+                    titleLine = csvLine;
+                }
+            }
+            logger.info("Temporary queue being returned: {}", queueDestination.getQueueName());
+            return queueDestination;
+        } catch (IOException ioException) {
+            throw new ConfRuntimeException("Failed to read from the workload data source file! " + ioException.getMessage());
+        }
+        catch (JMSException jmsException) {
+            throw new ConfRuntimeException("Unexpected error when sending JMS messages to a queue! " + jmsException.getMessage());
+        }
+    }
+
+    private void receiveMessagesFromTempTopic(TemporaryQueue queueDestination){
+
+        try {
+            logger.info("Temporary queue being used to consume: {}", queueDestination.getQueueName());
+            if (connectionFactory == null) {
+                
+                connectionFactory = createPulsarJmsConnectionFactory();
+
+                if (jmsContext == null) {
+                    jmsContext = createJmsContext(connectionFactory);
+                }
+
+                //if (queueDestination == null) {
+                    //queueDestination = createQueueDestination(jmsContext, topicName);
+                    //queueDestination = createTempQueueDestination(jmsContext, topicName);
+                
+
+                if (jmsConsumer == null) {
+                    jmsConsumer = jmsContext.createConsumer(queueDestination);
+                }
+                //}
+            }
+
+            int msgRecvd = 0;
+            if (numMsg == -1) {
+                numMsg = Integer.MAX_VALUE;
+            }
+
+            while (msgRecvd < numMsg) {
+                Message message = jmsConsumer.receive();
+                logger.info("Message received from topic {}: value={}",
+                        queueDestination.getQueueName(),
+                        message.getBody(String.class));
+                msgRecvd++;
+            }
+        }
+        catch (JMSException jmsException) {
+            throw new ConfRuntimeException("Unexpected error when receiving JMS messages from a queue! " + jmsException.getMessage());
+        }
+    }
+
+    @Override
+    public void execute() throws ConfRuntimeException {
+        //queueDestination = sendMessagesToTempTopic();
+        //receiveMessagesFromTempTopic(queueDestination);
+
+        // produce and consume messages 
+        try {
+            if (connectionFactory == null) {
+                connectionFactory = createPulsarJmsConnectionFactory();
+
+                if (jmsContext == null) {
+                    jmsContext = createJmsContext(connectionFactory);
+                    jmsProducer = jmsContext.createProducer();                   
+                }
+
+                if (queueDestination == null) {
+                    //queueDestination = createQueueDestination(jmsContext, topicName);
+                    queueDestination = jmsContext.createTemporaryQueue(); //createTempQueueDestination(jmsContext, topicName);
+                    logger.info("Temporary queue created: {}", queueDestination.getQueueName());
+                }
+            }
+            jmsConsumer = jmsContext.createConsumer(queueDestination);
+
+            assert (iotSensorDataCsvFile != null);
+            CsvFileLineScanner csvFileLineScanner = new CsvFileLineScanner(iotSensorDataCsvFile);
+
+            boolean isTitleLine = true;
+            String titleLine = "";
+            int msgSent = 0;
+            int msgRecvd = 0;
+            if (numMsg == -1) {
+                numMsg = Integer.MAX_VALUE;
+            }
+
             while (csvFileLineScanner.hasNextLine()) {
                 String csvLine = csvFileLineScanner.getNextLine();
                 // Skip the first line which is a title line
@@ -115,34 +220,6 @@ public class PulsarJMSExampleProcessor extends PulsarJMSExampleApplication {
                 }
             }
 
-        } catch (IOException ioException) {
-            throw new ConfRuntimeException("Failed to read from the workload data source file! " + ioException.getMessage());
-        }
-        catch (JMSException jmsException) {
-            throw new ConfRuntimeException("Unexpected error when sending JMS messages to a queue! " + jmsException.getMessage());
-        }
-
-        // receive messages now 
-        try {
-            if (connectionFactory == null) {
-                connectionFactory = createPulsarJmsConnectionFactory();
-
-                if (jmsContext == null) {
-                    jmsContext = createJmsContext(connectionFactory);
-                }
-
-                if (queueDestination == null) {
-                    if (jmsConsumer == null) {
-                        jmsConsumer = jmsContext.createConsumer(queueDestination);
-                    }
-                }
-            }
-
-            int msgRecvd = 0;
-            if (numMsg == -1) {
-                numMsg = Integer.MAX_VALUE;
-            }
-
             while (msgRecvd < numMsg) {
                 Message message = jmsConsumer.receive();
                 logger.info("Message received from topic {}: value={}",
@@ -150,9 +227,12 @@ public class PulsarJMSExampleProcessor extends PulsarJMSExampleApplication {
                         message.getBody(String.class));
                 msgRecvd++;
             }
-        }
-        catch (JMSException jmsException) {
-            throw new ConfRuntimeException("Unexpected error when receiving JMS messages from a queue! " + jmsException.getMessage());
+            
+            logger.info("Temporary queue being used: {}", queueDestination.getQueueName());
+        } catch (IOException ioException) {
+            throw new ConfRuntimeException("Failed to read from the workload data source file! " + ioException.getMessage());
+        } catch (JMSException jmsException) {
+            throw new ConfRuntimeException("Unexpected error when sending or receiving JMS messages to/from a queue! " + jmsException.getMessage());
         }
 
     }
