@@ -37,7 +37,7 @@ public class PulsarJMSExampleApplication implements CommandLineRunner {
   public void run(String... args) {
     // Send a message with a POJO - the template use the message converter
     for (int i = 0; i < 100; i++) {
-      jmsTemplate.convertAndSend("IN_QUEUE", new Email("info" + i + "@example.com", "Hello"));
+      jmsTemplate.convertAndSend("non-persistent://test-bed-nomura/default/test-topic-1", new Email("info" + i + "@example.com", "Hello"));
     }
 
     // in the meantime the Listener will receive the message and write to the console

@@ -15,14 +15,14 @@
  */
 package examples;
 
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.stereotype.Component;
+import java.util.HashMap;
+import java.util.Map;
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@Component
-public class ExampleListener {
-
-  @JmsListener(destination = "IN_QUEUE", containerFactory = "myFactory")
-  public void onMessage(Email email) {
-    System.out.println("Received " + email);
-  }
+@ConfigurationProperties("pulsar.jms")
+@ConfigurationPropertiesScan 
+@Data
+public class PulsarJMSConfigurationProperties {
+  private Map<String, Object> configuration = new HashMap<>();
 }
