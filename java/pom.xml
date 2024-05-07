@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.datastax.oss</groupId>
+  <artifactId>pulsar-jms-java-example</artifactId>
+  <packaging>jar</packaging>
+  <version>1.0</version>
+  <name>DataStax Fast JMS for Apache Pulsar (R) example</name>
+  <description>A simple JMS client designed to test the DataStax Fast JMS for Apache Pulsar library.</description>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <java.version>1.8</java.version>
+    <java.release.version>8</java.release.version>
+    <maven.compiler.source>8</maven.compiler.source>
+    <maven.compiler.target>8</maven.compiler.target>
+    <pulsar.version>2.10.4</pulsar.version>
+    <jackson.version>2.15.1</jackson.version>
+  </properties>
+  <dependencies>
+    <!-- https://mvnrepository.com/artifact/com.datastax.oss/pulsar-jms -->
+    <dependency>
+      <groupId>com.datastax.oss</groupId>
+      <artifactId>pulsar-jms-all</artifactId>
+      <version>4.0.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>1.7.30</version>
+    </dependency>
+    <dependency>
+          <groupId>commons-cli</groupId>
+          <artifactId>commons-cli</artifactId>
+          <version>1.5.0</version>
+      </dependency>
+
+      <dependency>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+          <version>3.12.0</version>
+      </dependency>
+
+      <dependency>
+          <groupId>commons-io</groupId>
+          <artifactId>commons-io</artifactId>
+          <version>2.11.0</version>
+      </dependency>
+
+      <dependency>
+          <groupId>commons-beanutils</groupId>
+          <artifactId>commons-beanutils</artifactId>
+          <version>1.9.4</version>
+      </dependency>
+
+      <dependency>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-configuration2</artifactId>
+          <version>2.9.0</version>
+      </dependency>
+
+      <dependency>
+          <groupId>org.junit.jupiter</groupId>
+          <artifactId>junit-jupiter-api</artifactId>
+          <version>5.9.2</version>
+          <scope>test</scope>
+      </dependency>
+      <dependency>
+          <groupId>org.apache.pulsar</groupId>
+          <artifactId>pulsar-client</artifactId>
+          <version>2.10.3</version>
+          <scope>compile</scope>
+      </dependency>
+      <dependency>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>logback-classic</artifactId>
+          <version>1.4.6</version>
+      </dependency>
+      <dependency>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-api</artifactId>
+          <version>2.0.7</version>
+      </dependency>
+      <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core -->
+      <dependency>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-core</artifactId>
+          <version>${jackson.version}</version>
+      </dependency>
+      <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
+      <dependency>
+          <groupId>com.fasterxml.jackson.core</groupId>
+          <artifactId>jackson-databind</artifactId>
+          <version>${jackson.version}</version>
+      </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-remote-resources-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+            <execution>
+                <goals>
+                    <goal>bundle</goal>
+                </goals>
+            </execution>
+        </executions>
+        <configuration>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+            <descriptorRefs>
+                <descriptorRef>jar-with-dependencies</descriptorRef>
+            </descriptorRefs>
+            <archive>
+              <manifest>
+                <mainClass>example.StandaloneTest</mainClass>
+              </manifest>
+            </archive>
+        </configuration>
+        <executions>
+            <execution>
+                <id>assemble-all</id>
+                <phase>package</phase>
+                <goals>
+                    <goal>single</goal>
+                </goals>
+            </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

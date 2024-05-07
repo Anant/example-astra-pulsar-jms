@@ -1,0 +1,9 @@
+
+
+>>> Creating the required Pulsar namespace ("test-bed-nomura/default") ...
+      [Failed] - failed status code 409]
+
+>>> Creating the required Pulsar topics ...
+    * Topic 1 : test-bed-nomura/default/test-topic-1
+      [Success]
+
