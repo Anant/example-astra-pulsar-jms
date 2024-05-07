@@ -101,7 +101,7 @@ abstract public class PulsarJMSExampleApplication extends PulsarJMSExample {
         if  (!(StringUtils.startsWith("non-persistent://", destName))) {
             destName = "non-persistent://" + destName;
         }
-
+        
         return jmsContext.createQueue(destName);
     }
 

@@ -65,8 +65,8 @@ public class PulsarJMSExampleReceiver extends PulsarJMSExampleApplication {
                 }
 
                 if (queueDestination == null) {
-                    //queueDestination = createQueueDestination(jmsContext, topicName);
-                    queueDestination = createTempQueueDestination(jmsContext, topicName);
+                    queueDestination = createQueueDestination(jmsContext, topicName);
+                    //queueDestination = createTempQueueDestination(jmsContext, topicName);
                     if (jmsConsumer == null) {
                         jmsConsumer = jmsContext.createConsumer(queueDestination);
                     }

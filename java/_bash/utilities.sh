@@ -296,7 +296,7 @@ createTopic() {
     local curlCmd="curl -sS -k -X PUT
     --write-out '%{http_code}'
     --output /tmp/curlCmdOutput.txt
-    --url '${webSvcUrl}/admin/v2/non-persistent/${topicName}/partitions'
+    --url '${webSvcUrl}/admin/v2/persistent/${topicName}/partitions'
     --header 'Content-Type: text/plain'"
                         
     if [[ ${jwtAuthEnalbed} -eq 1 ]]; then

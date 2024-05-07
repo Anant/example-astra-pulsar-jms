@@ -77,10 +77,10 @@ public class PulsarJMSExampleSender extends PulsarJMSExampleApplication {
                 }
 
                 if (queueDestination == null) {
-                    //queueDestination = createQueueDestination(jmsContext, topicName);
-                    queueDestination = createTempQueueDestination(jmsContext, topicName);
-
+                    queueDestination = createQueueDestination(jmsContext, topicName);
+                    //queueDestination = createTempQueueDestination(jmsContext, topicName);
                 }
+                
             }
 
             assert (iotSensorDataCsvFile != null);
