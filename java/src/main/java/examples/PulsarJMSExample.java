@@ -39,6 +39,7 @@ abstract public class PulsarJMSExample {
     // -1 means to process all available messages (indefinitely)
     protected Integer numMsg;
     protected String topicName;
+    protected String queueName;
     protected File clientConnFile;
     protected boolean useAstraStreaming;
 
@@ -62,6 +63,7 @@ abstract public class PulsarJMSExample {
         addOptionalCommandLineOption("h", "help", false, "Displays the usage method.");
         addRequiredCommandLineOption("n","numMsg", true, "Number of messages to process.");
         addOptionalCommandLineOption("t", "topic", true, "Pulsar topic name.");
+        addOptionalCommandLineOption("q", "queue", true, "Pulsar queue name.");
         addRequiredCommandLineOption("c","connFile", true, "\"client.conf\" file path.");
         addOptionalCommandLineOption("a", "astra", false, "Whether to use Astra streaming.");
     }
@@ -142,8 +144,11 @@ abstract public class PulsarJMSExample {
     		throw new InvalidParamException("Message number must be a positive integer or -1 (all available raw input)!");
     	}    	
 
-        // (Required) CLI option for Pulsar topic
+        // (Optional) CLI option for Pulsar topic
         topicName = processStringInputParam("t");
+
+        // (Optional) CLI option for Pulsar queue
+        queueName = processStringInputParam("q");
 
         // (Required) CLI option for client.conf file
         clientConnFile = processFileInputParam("c");
