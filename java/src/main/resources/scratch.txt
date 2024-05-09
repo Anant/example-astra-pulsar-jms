@@ -1,0 +1,112 @@
+
+
+    @Override
+    public void execute() throws ConfRuntimeException {
+        
+        // request and reply 
+        try {
+            if (connectionFactory == null) {
+                connectionFactory = createPulsarJmsConnectionFactory();
+
+                if (jmsContext == null) {
+                    jmsContext = createJmsContext(connectionFactory);
+                    jmsProducer = jmsContext.createProducer();                   
+                }
+
+                // Create a request queue
+                Queue requestQueue = createQueueDestination(jmsContext, queueName+"_request");
+                logger.info("Request queue created: {}", requestQueue.getQueueName());
+
+                // Create a reply queue
+                Queue replyQueue = createQueueDestination(jmsContext, queueName+"_reply");
+                logger.info("Reply queue created: {}", replyQueue.getQueueName());
+
+                // Create a topic
+                Topic topic = createTopicDestination(jmsContext, topicName);
+                logger.info("Topic created: {}", topic.getTopicName());
+
+
+                // Create a producer for the request queue: requestQueue
+                JMSProducer requestProducer = jmsContext.createProducer();
+
+                // Create a consumer for the request queue: requestQueue
+                JMSConsumer requestConsumer = jmsContext.createConsumer(requestQueue);
+
+                // Create a producer for the topic: topic
+                //JMSProducer topicProducer = jmsContext.createProducer();
+
+                // Create a consumer for the reply queue: replyQueue
+                //JMSConsumer replyConsumer = jmsContext.createConsumer(replyQueue);
+
+                // Create a consumer for the topic :topic
+                //JMSConsumer topicConsumer = jmsContext.createConsumer(topic);
+
+
+                // Send a bunch of messages to the request queu which will send replies to the reply queue
+                logger.info("Now sending messages to: ", requestQueue.getQueueName());
+
+                int mesgSent = 0;
+                while (mesgSent < 100) {
+                    // Create a request message
+                    TextMessage requestMessage = jmsContext.createTextMessage("Hello, Pulsar! : "+ mesgSent);
+                    logger.info("Message Sent: {}", mesgSent);
+
+                    // Set the reply queue as the JMSReplyTo
+                    requestMessage.setJMSReplyTo(replyQueue);
+                    // Send the request message to the request queue
+                    requestProducer.send(requestQueue, requestMessage);
+                    mesgSent++;
+                }
+
+                // Sleep for 30 seconds
+                int sleepSeconds=30;
+                logger.info("Requests Sent, waiting for {} Seconds.", sleepSeconds);
+                Thread.sleep(sleepSeconds*100);
+                
+                logger.info("Now receiving messages from: ", requestQueue.getQueueName());
+                int mesgRecvd = 0;
+                while (mesgRecvd < 100) {
+                    // Receive the message from the request queue, and then send it to the reply queue
+                    Message requestMessage = requestConsumer.receive();
+                    // Process the reply message
+                    String contents="";
+
+                    if (requestMessage instanceof TextMessage) {
+                        TextMessage textMessage = (TextMessage) requestMessage;
+                        contents = textMessage.getText();
+                        logger.info("Received request: {}", contents);
+                    } else {
+                        contents = requestMessage.toString();
+                        logger.info("Received request: {}", contents);
+                    }
+
+                    
+
+                    // Send the reply to the replyto queue
+                    //String contents = requestMessage.getText();
+                    Destination replyDestination = requestMessage.getJMSReplyTo();
+				    JMSProducer replyProducer = jmsContext.createProducer();
+
+                    // Create a reply message
+                    TextMessage replyMessage = jmsContext.createTextMessage("Hello back, Pulsar! : "+ contents);
+                    replyMessage.setText(contents);
+				    replyMessage.setJMSCorrelationID(requestMessage.getJMSMessageID());
+				    replyProducer.send(replyDestination, replyMessage);
+
+                    logger.info("Message Replied: {}", mesgSent);                    
+                    mesgRecvd++;
+                }
+
+            }
+            
+            
+            logger.info("Request Reply finished");
+        } /*catch (IOException ioException) {
+            throw new ConfRuntimeException("Failed to read from the workload data source file! " + ioException.getMessage());
+        } */catch (InterruptedException intrptException) {
+            throw new ConfRuntimeException("Unexpected error with an interruption." + intrptException.getMessage());
+        } catch (JMSException jmsException) {
+            throw new ConfRuntimeException("Unexpected error when sending or receiving JMS messages to/from a queue! " + jmsException.getMessage());
+        }
+
+    }

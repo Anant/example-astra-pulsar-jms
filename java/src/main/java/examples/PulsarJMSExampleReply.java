@@ -29,20 +29,20 @@ import javax.jms.*;
 import java.io.File;
 import java.io.IOException;
 
-public class PulsarJMSExampleRequestReply extends PulsarJMSExampleApplication {
+public class PulsarJMSExampleReply extends PulsarJMSExampleApplication implements MessageListener {
     // Must be set before initializing the "logger" object.
-    private final static String APP_NAME = "PulsarJMSExampleRequestReply";
+    private final static String APP_NAME = "PulsarJMSExampleReply";
     static { System.setProperty("log_file_base_name", getLogFileName(API_TYPE, APP_NAME)); }
-    private final static Logger logger = LoggerFactory.getLogger(PulsarJMSExampleSender.class);
+    private final static Logger logger = LoggerFactory.getLogger(PulsarJMSExampleReply.class);
 
     private static PulsarConnectionFactory connectionFactory;
     private static JMSContext jmsContext;
     private static JMSProducer jmsProducer;
     private static JMSConsumer jmsConsumer;
-    private static TemporaryQueue queueDestination;
+    private static Queue queueDestination;
 
     private File iotSensorDataCsvFile;
-    public PulsarJMSExampleRequestReply(String appName, String[] inputParams) {
+    public PulsarJMSExampleReply(String appName, String[] inputParams) {
         super(appName, inputParams);
         addRequiredCommandLineOption("csv","csvFile", true, "IoT sensor data CSV file.");
 
@@ -50,7 +50,7 @@ public class PulsarJMSExampleRequestReply extends PulsarJMSExampleApplication {
     }
 
     public static void main(String[] args) {
-        PulsarJMSExample workshopApp = new PulsarJMSExampleRequestReply(APP_NAME, args);
+        PulsarJMSExample workshopApp = new PulsarJMSExampleReply(APP_NAME, args);
         int exitCode = workshopApp.runCmdApp();
         System.exit(exitCode);
     }
@@ -71,72 +71,70 @@ public class PulsarJMSExampleRequestReply extends PulsarJMSExampleApplication {
     @Override
     public void execute() throws ConfRuntimeException {
         
-        // request and reply 
         try {
             if (connectionFactory == null) {
                 connectionFactory = createPulsarJmsConnectionFactory();
 
+                
                 if (jmsContext == null) {
                     jmsContext = createJmsContext(connectionFactory);
                     jmsProducer = jmsContext.createProducer();                   
                 }
+                // Create an admin queue
+                queueDestination = createTempQueueDestination(jmsContext, queueName);
+                logger.info("Admin messages queue created: {}", queueDestination.getQueueName());
 
-                // Create a request queue
-                Queue requestQueue = createQueueDestination(jmsContext, queueName+"_request");
-                logger.info("Request queue created: {}", requestQueue.getQueueName());
+                // Create a producer for admin queue
+                jmsProducer = jmsContext.createProducer();
+                jmsProducer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
-                // Create a reply queue
-                Queue replyQueue = createQueueDestination(jmsContext, queueName+"_reply");
-                logger.info("Reply queue created: {}", replyQueue.getQueueName());
-
-                // Create a topic
-                Topic topic = createTopicDestination(jmsContext, topicName);
-                logger.info("Topic created: {}", topic.topicName());
-
-
-                // Create a producer for the request queue
-                MessageProducer requestProducer = jmsContext.createProducer(requestQueue);
-
-                // Create a producer for the topic
-                MessageProducer topicProducer = jmsContext.createProducer(topic);
-
-                // Create a consumer for the reply queue
-                MessageConsumer replyConsumer = jmsContext.createConsumer(replyQueue);
-
-                // Create a consumer for the topic
-                MessageConsumer topicConsumer = jmsContext.createConsumer(topic);
-
-                // Create a request message
-                TextMessage requestMessage = jmsContext.createTextMessage("Hello, Pulsar!");
-
-                // Set the reply queue as the JMSReplyTo
-                requestMessage.setJMSReplyTo(replyQueue);
-
-                // Send the request message to the request queue
-                requestProducer.send(requestMessage);
-
-                // Receive the reply message from the reply queue
-                Message replyMessage = replyConsumer.receive();
-
-                // Process the reply message
-                if (replyMessage instanceof TextMessage) {
-                    TextMessage textMessage = (TextMessage) replyMessage;
-                    System.out.println("Received reply: " + textMessage.getText());
-                } else {
-                    System.out.println("Received reply: " + replyMessage);
-                }
-
-
+    
+                //Set up a consumer to consume messages off of the admin queue
+                jmsConsumer = jmsContext.createConsumer(queueDestination);
+                jmsConsumer.setMessageListener(this);
             }
-            
-            
-            logger.info("Request Reply finished");
-        } catch (IOException ioException) {
+        } /*catch (IOException ioException) {
             throw new ConfRuntimeException("Failed to read from the workload data source file! " + ioException.getMessage());
-        } catch (JMSException jmsException) {
+        } catch (InterruptedException intrptException) {
+            throw new ConfRuntimeException("Unexpected error with an interruption." + intrptException.getMessage());
+        } */ catch (JMSException jmsException) {
             throw new ConfRuntimeException("Unexpected error when sending or receiving JMS messages to/from a queue! " + jmsException.getMessage());
         }
 
+    }
+
+
+    public String handleProtocolMessage(String messageText) {
+        String responseText;
+        if ("MyProtocolMessage".equalsIgnoreCase(messageText)) {
+            responseText = "I recognize your protocol message";
+        } else {
+            responseText = "Unknown protocol message: " + messageText;
+        }
+        
+        return responseText;
+    }
+
+    public void onMessage(Message message) {
+        try {
+            TextMessage response = jmsContext.createTextMessage();
+            if (message instanceof TextMessage) {
+                TextMessage txtMsg = (TextMessage) message;
+                String messageText = txtMsg.getText();
+                response.setText(handleProtocolMessage(messageText));
+            }
+
+            //Set the correlation ID from the received message to be the correlation id of the response message
+            //this lets the client identify which message this is a response to if it has more than
+            //one outstanding message to the server
+            response.setJMSCorrelationID(message.getJMSCorrelationID());
+
+            //Send the response to the Destination specified by the JMSReplyTo field of the received message,
+            //this is presumably a temporary queue created by the client
+            jmsProducer.send(message.getJMSReplyTo(), response);
+        } catch (JMSException jmsException) {
+            throw new ConfRuntimeException("Unexpected error when sending or receiving JMS messages to/from a queue! " + jmsException.getMessage());
+        }
     }
 
     @Override

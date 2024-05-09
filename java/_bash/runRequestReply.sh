@@ -32,20 +32,24 @@ echo
 #
 usage() {   
    echo
-   echo "Usage: runProcessor.sh [-h]" 
+   echo "Usage: runRequestReply.sh [-h]" 
+   echo "                      -m <mode>"
    echo "                      -t <topic_name>"
+   echo "                      -q <queue_name>"
    echo "                      -n <message_number>"
    echo "                      -cc <client_conf_file>" 
    echo "                      [-na]"
    echo "       -h  : Show usage info"
-   echo "       -t  : (Required) The topic name to publish messages to."
+   echo "       -m  : (Required) req or rep"
+   echo "       -t  : (Optional) The topic name to publish messages to."
+   echo "       -q  : (Optional) The queue name to publish messages to."
    echo "       -n  : (Required) The number of messages to produce."
    echo "       -cc : (Required) 'client.conf' file path."
    echo "       -na : (Optional) Non-Astra Streaming (Astra streaming is the default)."
    echo
 }
 
-if [[ $# -eq 0 || $# -gt 8 ]]; then
+if [[ $# -eq 0 || $# -gt 10 ]]; then
    usage
    errExit 10 "Incorrect input parameter count!"
 fi
@@ -53,8 +57,9 @@ fi
 astraStreaming=1
 while [[ "$#" -gt 0 ]]; do
    case $1 in
-      -h)  usage; exit 0      ;;
+      -h)  usage; exit 0      ;;      
       -na) astraStreaming=0;  ;;
+      -m)  mode=$2; shift     ;;
       -t)  tpName=$2; shift   ;;
       -q)  quName=$2; shift   ;;
       -n)  msgNum=$2; shift   ;;
@@ -64,10 +69,16 @@ while [[ "$#" -gt 0 ]]; do
    shift
 done
 debugMsg "astraStreaming=${astraStreaming}"
+debugMsg "mode=${mode}"
 debugMsg "tpName=${tpName}"
 debugMsg "quName=${quName}"
 debugMsg "msgNum=${msgNum}"
 debugMsg "clntConfFile=${clntConfFile}"
+
+
+if [[ -z "${mode}" ]]; then
+   errExit 30 "Must provided a valid mode \"req\" or \"rep\" !"
+fi
 
 if [[ -z "${tpName}" ]]; then
    errExit 30 "Must provided a valid topic name in format \"<tenant>/<namespace>/<topic>\"!"
@@ -91,9 +102,18 @@ if ! [[ -f "${iotDataSrcFile}" ]]; then
   errExit 60 "Can't find the IoT sensor data source file is invalid!"
 fi
 
-javaCmd="java -cp ${clientAppJar} \
-    example.PulsarJMSExampleRequestReply \
-    -n ${msgNum} -t ${tpName} -c ${clntConfFile} -csv ${iotDataSrcFile}"
+if [[ "${mode}" == "req" ]]; then
+   javaCmd="java -cp ${clientAppJar} \
+      example.PulsarJMSExampleRequest \
+      -n ${msgNum} -t ${tpName} -q ${quName} -c ${clntConfFile} -csv ${iotDataSrcFile}"
+elif [[ "${mode}" == "rep" ]]; then
+   javaCmd="java -cp ${clientAppJar} \
+      example.PulsarJMSExampleReply \
+      -n ${msgNum} -t ${tpName} -q ${quName} -c ${clntConfFile} -csv ${iotDataSrcFile}"
+else
+   errExit 30 "Invalid mode specified!"
+fi
+
 if [[ ${astraStreaming} -eq 1 ]]; then
   javaCmd="${javaCmd} -a"
 fi
