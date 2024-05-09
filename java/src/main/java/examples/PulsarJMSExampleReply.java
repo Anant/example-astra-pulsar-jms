@@ -93,6 +93,9 @@ public class PulsarJMSExampleReply extends PulsarJMSExampleApplication implement
                 jmsConsumer = jmsContext.createConsumer(queueDestination);
                 jmsConsumer.setMessageListener(this);
             }
+            jmsConsumer.receive();
+            logger.info("Waiting for messages: \"" + appName + "\" ...");
+
         } /*catch (IOException ioException) {
             throw new ConfRuntimeException("Failed to read from the workload data source file! " + ioException.getMessage());
         } catch (InterruptedException intrptException) {

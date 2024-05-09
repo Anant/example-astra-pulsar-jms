@@ -118,7 +118,7 @@ public class PulsarJMSExampleRequest extends PulsarJMSExampleApplication impleme
                 jmsProducer.send(queueDestination, requestMessage);
             }
             
-            logger.info("Request Reply finished");
+            logger.info("Request finished");
         } /*catch (IOException ioException) {
             throw new ConfRuntimeException("Failed to read from the workload data source file! " + ioException.getMessage());
         } catch (InterruptedException intrptException) {
