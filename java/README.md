@@ -1,4 +1,12 @@
+# JMS Examples
 
+Right now have done work on the java app. So everything is inside `java` 
+
+```
+cd java
+```
+
+Before starting, make sure to change to the java directory and download `client.conf` that you get from the astra streaming dashboard and place it to the `java` directory.
 
 # Steps 
 
