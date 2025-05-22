@@ -116,6 +116,21 @@ else
     done
 fi
 
+# Get topics per pattern and broadcast patterns
+topicsPerPattern=$(getPropVal ${deployPropFile} "topicsPerPattern")
+topicBroadcastPatterns=$(getPropVal ${deployPropFile} "topicBroadcastPatterns")
+
+# Create topics for each pattern
+if [[ ! -z "${topicBroadcastPatterns// }" ]]; then
+    IFS=',' read -r -a patternArr <<< "${topicBroadcastPatterns}"
+    for pattern in "${patternArr[@]}"; do
+        for i in $(seq 1 ${topicsPerPattern}); do
+            topicName=$(echo ${pattern} | sed "s/\*/$(printf "%03d" $i)/")
+            pulsarTopics+=("${tenant}/${namespace}/${topicName}")
+        done
+    done
+fi
+
 startDate=$(date +'%Y-%m-%d')
 deployLogHomeDir="${SCENARIO_HOMEDIR}/logs/${startDate}"
 deployMainLogFile="${deployLogHomeDir}/deployMain.log"

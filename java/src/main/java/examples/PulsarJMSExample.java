@@ -16,235 +16,120 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package example;
+package examples;
 
-import example.ConfClientConnection;
-import org.apache.commons.cli.*;
-import org.apache.commons.lang3.BooleanUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
+import com.datastax.oss.pulsar.jms.PulsarConnectionFactory;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import javax.jms.Connection;
+import javax.jms.ConnectionFactory;
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.MessageConsumer;
+import javax.jms.MessageListener;
+import javax.jms.MessageProducer;
+import javax.jms.Session;
+import javax.jms.TextMessage;
+import lombok.extern.slf4j.Slf4j;
 
-import example.exception.HelpExitException;
-import example.exception.InvalidParamException;
-import example.exception.ConfRuntimeException;
+@Slf4j
+public class PulsarJMSExample {
+    private final TopicPatternManager topicManager;
+    private final ConnectionFactory connectionFactory;
+    private Connection connection;
+    private Session session;
+    private final ScheduledExecutorService executor;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
-
-abstract public class PulsarJMSExample {
-
-    protected String[] rawCmdInputParams;
-
-    // -1 means to process all available messages (indefinitely)
-    protected Integer numMsg;
-    protected String topicName;
-    protected String queueName;
-    protected File clientConnFile;
-    protected boolean useAstraStreaming;
-
-    protected ConfClientConnection clientConnConf;
-
-    protected final String appName;
-
-    protected CommandLine commandLine;
-    protected final DefaultParser commandParser;
-    protected final Options cliOptions = new Options();
-
-    public abstract void processExtendedInputParams() throws InvalidParamException;
-    public abstract void execute();
-    public abstract void termCmdApp();
-
-    public PulsarJMSExample(String appName, String[] inputParams) {
-        this.appName = appName;
-        this.rawCmdInputParams = inputParams;
-        this.commandParser = new DefaultParser();
-
-        addOptionalCommandLineOption("h", "help", false, "Displays the usage method.");
-        addRequiredCommandLineOption("n","numMsg", true, "Number of messages to process.");
-        addOptionalCommandLineOption("t", "topic", true, "Pulsar topic name.");
-        addOptionalCommandLineOption("q", "queue", true, "Pulsar queue name.");
-        addRequiredCommandLineOption("c","connFile", true, "\"client.conf\" file path.");
-        addOptionalCommandLineOption("a", "astra", false, "Whether to use Astra streaming.");
-    }
-
-    protected void addRequiredCommandLineOption(String option, String longOption, boolean hasArg, String description) {
-        Option opt = new Option(option, longOption, hasArg, description);
-        opt.setRequired(true);
-    	cliOptions.addOption(opt);
-    }
-
-    protected void addOptionalCommandLineOption(String option, String longOption, boolean hasArg, String description) {
-        Option opt = new Option(option, longOption, hasArg, description);
-        opt.setRequired(false);
-        cliOptions.addOption(opt);
-    }
-
-    protected static String getLogFileName(String apiType, String appName) {
-        return apiType + "-" + appName;
-    }
-
-
-    public int runCmdApp() {
-        int exitCode = 0;
-        try {
-            this.processInputParams();
-            this.execute();
-        }
-        catch (HelpExitException hee) {
-            this.usage(appName);
-            exitCode = 1;
-        }
-        catch (InvalidParamException ipe) {
-            System.out.println("\n[ERROR] Invalid input value(s) detected!");
-            ipe.printStackTrace();
-            exitCode = 2;
-        }
-        catch (ConfRuntimeException wre) {
-            System.out.println("\n[ERROR] Unexpected runtime error detected!");
-            wre.printStackTrace();
-            exitCode = 3;
-        }
-        finally {
-            this.termCmdApp();
-        }
+    public PulsarJMSExample() throws Exception {
+        // Load configuration
+        Properties props = new Properties();
+        props.load(getClass().getClassLoader().getResourceAsStream("application.properties"));
         
-        return exitCode;
+        // Initialize topic manager
+        this.topicManager = new TopicPatternManager();
+        
+        // Initialize connection factory
+        this.connectionFactory = new PulsarConnectionFactory(props);
+        
+        // Initialize executor for publishing messages
+        this.executor = Executors.newSingleThreadScheduledExecutor();
     }
 
-    public void usage(String appNme) {
-        PrintWriter printWriter = new PrintWriter(System.out, true);
+    public void start() throws JMSException {
+        // Create connection and session
+        connection = connectionFactory.createConnection();
+        session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        connection.start();
 
-        HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp(printWriter, 150, appName,
-                "Command Line Options:",
-                cliOptions, 2, 1, "", true);
+        // Start publishing messages
+        startPublishing();
 
-        System.out.println();
+        // Subscribe to patterns
+        subscribeToPattern("*-message-*", "All messages");
+        subscribeToPattern("stage-message-*", "Stage messages");
+        subscribeToPattern("prod-message-*", "Production messages");
     }
-    
-    public void processInputParams() throws HelpExitException, InvalidParamException {
 
-    	if (commandLine == null) {
+    private void startPublishing() {
+        executor.scheduleAtFixedRate(() -> {
             try {
-                commandLine = commandParser.parse(cliOptions, rawCmdInputParams);
-            } catch (ParseException e) {
-                throw new InvalidParamException("Failed to parse application CLI input parameters: " + e.getMessage());
+                String topic = topicManager.getRandomTopic();
+                MessageProducer producer = session.createProducer(session.createTopic(topic));
+                TextMessage message = session.createTextMessage("Hello from " + topic);
+                producer.send(message);
+                log.info("Sent message to topic: {}", topic);
+                producer.close();
+            } catch (JMSException e) {
+                log.error("Error sending message", e);
             }
-    	}
-    	
-    	// CLI option for help messages
-        if (commandLine.hasOption("h")) {
-            throw new HelpExitException();
-        }
-
-        // (Required) CLI option for number of messages
-        numMsg = processIntegerInputParam("n");
-    	if ( (numMsg <= 0) && (numMsg != -1) ) {
-    		throw new InvalidParamException("Message number must be a positive integer or -1 (all available raw input)!");
-    	}    	
-
-        // (Optional) CLI option for Pulsar topic
-        topicName = processStringInputParam("t");
-
-        // (Optional) CLI option for Pulsar queue
-        queueName = processStringInputParam("q");
-
-        // (Required) CLI option for client.conf file
-        clientConnFile = processFileInputParam("c");
-        if (clientConnFile != null) {
-            clientConnConf = new ConfClientConnection(clientConnFile);
-        }
-
-        // (Optional) Whether to use Astra Streaming
-        useAstraStreaming = processBooleanInputParam("a", true);
-
-        processExtendedInputParams();
+        }, 0, 1, TimeUnit.SECONDS);
     }
 
-    public boolean processBooleanInputParam(String optionName) {
-        return processBooleanInputParam(optionName, false);
+    private void subscribeToPattern(String pattern, String listenerName) throws JMSException {
+        List<String> matchingTopics = topicManager.getTopicsByPattern(pattern);
+        log.info("Subscribing to {} topics matching pattern: {}", matchingTopics.size(), pattern);
+
+        for (String topic : matchingTopics) {
+            MessageConsumer consumer = session.createConsumer(session.createTopic(topic));
+            consumer.setMessageListener(new MessageListener() {
+                @Override
+                public void onMessage(Message message) {
+                    try {
+                        if (message instanceof TextMessage) {
+                            String text = ((TextMessage) message).getText();
+                            log.info("{} received on topic {}: {}", listenerName, topic, text);
+                        }
+                    } catch (JMSException e) {
+                        log.error("Error processing message", e);
+                    }
+                }
+            });
+        }
     }
-    public boolean processBooleanInputParam(String optionName, boolean dftValue) {
-        Option option = cliOptions.getOption(optionName);
 
-        // Default value if not present on command line
-        boolean boolVal = dftValue;
-        String value = commandLine.getOptionValue(option.getOpt());
-
-        if (option.isRequired()) {
-            if (StringUtils.isBlank(value)) {
-                throw new InvalidParamException("Empty value for argument '" + optionName + "'");
+    public void stop() {
+        try {
+            executor.shutdown();
+            if (connection != null) {
+                connection.close();
             }
+        } catch (JMSException e) {
+            log.error("Error closing connection", e);
         }
-
-        if (StringUtils.isNotBlank(value)) {
-            boolVal=BooleanUtils.toBoolean(value);
-        }
-
-        return boolVal;
     }
 
-    public int processIntegerInputParam(String optionName) {
-        return processIntegerInputParam(optionName, 0);
-    }
-    public int processIntegerInputParam(String optionName, int dftValue) {
-        Option option = cliOptions.getOption(optionName);
+    public static void main(String[] args) {
+        try {
+            PulsarJMSExample example = new PulsarJMSExample();
+            example.start();
 
-        // Default value if not present on command line
-        int intVal = dftValue;
-        String value = commandLine.getOptionValue(option.getOpt());
-
-        if (option.isRequired()) {
-            if (StringUtils.isBlank(value)) {
-                throw new InvalidParamException("Empty value for argument '" + optionName + "'");
-            }
+            // Keep the application running
+            Thread.currentThread().join();
+        } catch (Exception e) {
+            log.error("Error running example", e);
         }
-
-        if (StringUtils.isNotBlank(value)) {
-            intVal = NumberUtils.toInt(value);
-        }
-
-        return intVal;
-    }
-
-    public String processStringInputParam(String optionName) {
-        return processStringInputParam(optionName, null);
-    }
-    public String processStringInputParam(String optionName, String dftValue) {
-    	Option option = cliOptions.getOption(optionName);
-
-        String strVal = dftValue;
-        String value = commandLine.getOptionValue(option);
-
-        if (option.isRequired()) {
-            if (StringUtils.isBlank(value)) {
-                throw new InvalidParamException("Empty value for argument '" + optionName + "'");
-            }
-        }
-
-        if (StringUtils.isNotBlank(value)) {
-            strVal = value;
-        }
-
-        return strVal;
-    }
-    
-    public File processFileInputParam(String optionName) {
-        Option option = cliOptions.getOption(optionName);
-
-        File file = null;
-
-        if (option.isRequired()) {
-            String path = commandLine.getOptionValue(option.getOpt());
-            try {
-                file = new File(path);
-                file.getCanonicalPath();
-            } catch (IOException ex) {
-                throw new InvalidParamException("Invalid file path for param '" + optionName + "': " + path);
-            }
-        }
-
-        return file;
     }
 }
