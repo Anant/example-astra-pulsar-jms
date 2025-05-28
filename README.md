@@ -1,97 +1,104 @@
-# DataStax Apache Pulsar JMS Client - Spring Example
+# DataStax Apache Pulsar JMS Client Examples
 
-This is a sample project that demonstrates how to use Apache Pulsar as a JMS provider with Spring Boot. It shows how to integrate Pulsar's JMS client with Spring's JMS support to create a robust messaging application.
+This repository contains example projects demonstrating how to use Apache Pulsar as a JMS provider. It includes two implementations:
+1. A pure Java implementation (current, production-ready)
+2. A Spring Boot implementation (work in progress)
 
 ## Overview
 
-This example demonstrates:
-- Integration of Apache Pulsar with Spring Boot using the DataStax Pulsar JMS client
+These examples demonstrate:
+- Integration of Apache Pulsar with JMS using the DataStax Pulsar JMS client
 - Configuration of Pulsar JMS connection factory and connection
-- Sending and receiving messages using Spring's JMS template
-- Message listener implementation using Spring's `@JmsListener` annotation
-- Handling of custom message types (Email objects)
+- Sending and receiving messages using JMS
+- Message listener implementation
+- Handling of custom message types
+- Support for both Astra Streaming and standalone Pulsar deployments
+
+## Project Structure
+
+The repository is organized into two main directories:
+
+### Java Implementation (`/java`)
+This is the current, production-ready implementation that includes:
+- Pure Java-based JMS client implementation
+- Support for both Astra Streaming and standalone Pulsar
+- Comprehensive deployment scripts
+- Example patterns for different messaging scenarios
+- Configuration management for different environments
+
+### Spring Implementation (`/spring`)
+This is a work-in-progress implementation that demonstrates:
+- Integration with Spring Boot
+- Spring's JMS template usage
+- Spring's `@JmsListener` annotation
+- Spring-based configuration
 
 ## Prerequisites
 
 - Java 8 or higher
 - Maven
 - Docker (optional, for running Pulsar locally)
+- Astra Streaming account (optional, for cloud deployment)
 
-## Project Structure
+## Running the Examples
 
-The project consists of several key components:
-- `PulsarJMSConfiguration`: Configures the Pulsar JMS connection factory and connection
-- `PulsarJMSConfigurationProperties`: Contains configuration properties for Pulsar connection
-- `PulsarJMSExampleApplication`: Main application class that demonstrates message sending
-- `ExampleListener`: Message listener implementation
-- `Email`: Sample message payload class
+### Java Implementation
 
-## Running the Example
+1. Configure your environment:
+   - For Astra Streaming: Set up your `client.conf` with your Astra credentials
+   - For standalone Pulsar: Use the default configuration
 
-### 1. Start Pulsar
+2. Build the project:
+```bash
+cd java
+mvn clean package
+```
 
-You can start Pulsar using Docker:
+3. Run the example:
+```bash
+./_bash/deploy.sh -cc <path-to-client.conf>
+```
 
+### Spring Implementation (Work in Progress)
+
+1. Start Pulsar (if using standalone):
 ```bash
 docker run -p 8080:8080 -p 6650:6650 apachepulsar/pulsar:latest bin/pulsar standalone
 ```
 
-Or by starting [Pulsar Standalone](https://pulsar.apache.org/docs/en/standalone/) directly.
-
-### 2. Build and Run
-
-Build the project using Maven:
-
+2. Build and run:
 ```bash
-mvn clean package -DskipTests
-```
-
-Run the application:
-
-```bash
+cd spring
+mvn clean package
 mvn spring-boot:run
 ```
 
-## How It Works
+## Configuration
 
-### Sending Messages
+### Java Implementation
+The Java implementation supports both Astra Streaming and standalone Pulsar through:
+- `client.conf`: Connection configuration
+- `deploy.properties`: Topic and namespace configuration
+- Environment-specific settings
 
-The application uses Spring's `JmsTemplate` to send messages. Messages are sent as serialized Java objects:
-
-```java
-JmsTemplate jmsTemplate = context.getBean(JmsTemplate.class);
-jmsTemplate.convertAndSend("IN_QUEUE", new Email("info@example.com", "Hello"));
-```
-
-### Receiving Messages
-
-Messages are received using Spring's `@JmsListener` annotation:
-
-```java
-@Component
-public class ExampleListener {
-    @JmsListener(destination = "IN_QUEUE", containerFactory = "myFactory")
-    public void onMessage(Email email) {
-        System.out.println("Received " + email);
-    }
-}
-```
-
-### Configuration
-
-The application is configured to connect to a Pulsar broker running at `http://localhost:8080`. The configuration includes:
+### Spring Implementation
+The Spring implementation uses:
+- `application.properties` for configuration
+- Spring's auto-configuration capabilities
 - JMS connection factory setup
-- Connection pooling
-- Message listener container configuration
-- Topic/queue mapping
 
 ## Dependencies
 
-The project uses:
+### Java Implementation
+- DataStax Pulsar JMS Client 4.0.1
+- SLF4J for logging
+- JUnit for testing
+
+### Spring Implementation
 - Spring Boot 2.4.5
 - DataStax Pulsar JMS Client 4.0.1
 - Spring Pulsar 1.0.5
-- Lombok for reducing boilerplate code
+- Lombok
 
 ## License
 
